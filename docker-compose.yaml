@@ -1,0 +1,10 @@
+version: '2.3'
+services:
+  gpgpu_dev_env_service:
+    image: atomesz/gpgpu_dev_env:latest
+    container_name: gpgpu_dev_env
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    runtime: nvidia
+    volumes:
+    - .:/app
