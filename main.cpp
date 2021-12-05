@@ -17,9 +17,9 @@ int main() {
         std::cout << "Could not read the image" << std::endl;
         return 1;
     }
-    cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
-    cv::imshow("Display window", img);
-    cv::waitKey(0);
+    //cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
+    //cv::imshow("Display window", img);
+    //cv::waitKey(0);
 
 
     int scale_factor = 1;
