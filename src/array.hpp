@@ -16,4 +16,4 @@ public:
     T& at(const size_t i_dim1, const size_t i_dim2);
 };
 
-#include "array.tpp"
+#include "array.hxx"

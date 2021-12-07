@@ -13,4 +13,4 @@ public:
     Array<T>* img_feature_y;
 };
 
-#include "img_features.tpp"
+#include "img_features.hxx"
