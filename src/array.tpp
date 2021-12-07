@@ -1,4 +1,4 @@
-#include "array.hpp"
+#pragma once
 
 template<typename T>
 Array<T>::Array(const size_t size_dim1, const size_t size_dim2)

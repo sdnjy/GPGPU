@@ -12,3 +12,5 @@ public:
     Array<T>* img_feature_x;
     Array<T>* img_feature_y;
 };
+
+#include "img_features.tpp"

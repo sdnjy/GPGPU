@@ -1,4 +1,4 @@
-#include "img_features.hpp"
+#pragma once
 
 template<typename T>
 ImgFeatures<T>::ImgFeatures(const size_t size_dim1, const size_t size_dim2)
