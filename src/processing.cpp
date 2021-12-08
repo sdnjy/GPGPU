@@ -74,36 +74,34 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
     cv::Mat features_crop_x = (*img_feature_x)(myROI);
     cv::Mat features_crop_y = (*img_feature_y)(myROI);
 
-    // allocate space for features_patch
-    uint8_t features_patch_x[num_patchs_x][num_patchs_y][pool_size][pool_size];
-    uint8_t features_patch_y[num_patchs_x][num_patchs_y][pool_size][pool_size];
-
     int16_t tmp_response[num_patchs_y][num_patchs_x];
 
     // fill features_patch
 
     // Allocate table of size heigth/pool_size * weight/pool_size
 
-    // for each patch
-    for (int i = 0; i < img.rows; ++i)
+    for (int i = 0; i < features_crop_x.rows; ++i)
     {
-        for (int j = 0; j < img.cols; ++j)
+        for (int j = 0; j < features_crop_x.cols; ++j)
         {
-            auto f_x = img_features_x->at<uint8_t>(i, j);
-            auto f_y = img_features_y->at<uint8_t>(i, j);
+            auto f_x = features_crop_x.at<uint8_t>(i, j);
+            auto f_y = features_crop_y.at<uint8_t>(i, j);
 
             auto diff = f_x - f_y;
-            tmp_response[i % pool_size][j % pool_size] += diff
+            tmp_response[i / pool_size][j / pool_size] += diff;
         }
     }
 
+    const int pool_size_squared = pool_size * pool_size;
+
+    uint8_t max_value = 0;
     // clip between 0 and 255
     uint8_t response[num_patchs_y][num_patchs_x];
     for (int i_patch_y = 0; i_patch_y < num_patchs_y; ++i_patch_y)
     {
         for (int i_patch_x = 0; i_patch_x < num_patchs_x; ++i_patch_x)
         {
-            int16_t current_value = tmp_response[i_patch_y][i_patch_x];
+            int16_t current_value = tmp_response[i_patch_y][i_patch_x] / pool_size_squared;
 
             if (current_value <= 0)
                 response[i_patch_y][i_patch_x] = 0;
@@ -112,9 +110,25 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
             else
                 response[i_patch_y][i_patch_x] = 255;
 
+            if (response[i_patch_y][i_patch_x] > max_value)
+                max_value = response[i_patch_y][i_patch_x];
         }
     }
 
+    const uint8_t threshold = max_value / 2;
+    for (int i_patch_y = 0; i_patch_y < num_patchs_y; ++i_patch_y)
+    {
+        for (int i_patch_x = 0; i_patch_x < num_patchs_x; ++i_patch_x)
+        {
+            response[i_patch_y][i_patch_x] = 255 * (response[i_patch_y][i_patch_x] >= threshold);
+        }
+    }
+
+    
+    cv::Mat mat_response(num_patchs_y, num_patchs_x, CV_8UC1, response);
+
+    cv::imwrite("mat_response.jpg", mat_response);
+    delete img_features;
 
 }
 
