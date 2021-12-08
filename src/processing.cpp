@@ -53,13 +53,63 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         exit(1);
     }
 
-    ImgFeatures* img_features = _compute_features(img, img.cols, img.rows);
+    ImgFeatures* img_features = _compute_features(img, img.rows, img.cols);
 
-    size_t patchs_x = img.cols / pool_size;
-    size_t patchs_y = img.rows / pool_size;
+    size_t num_patchs_x = img.cols / pool_size;
+    size_t num_patchs_y = img.rows / pool_size;
+
+    //save both features
+    cv::imwrite("totox.jpg", *img_features->img_feature_x);
+    cv::imwrite("totoy.jpg", *img_features->img_feature_y);
 
     
-    
+    cv::Mat* img_feature_x = img_features->img_feature_x;
+    cv::Mat* img_feature_y = img_features->img_feature_y;
+
+    // Setup a rectangle to define your region of interest for the crop
+    cv::Rect myROI(0, 0, img.cols - img.cols % (pool_size * num_patchs_x), img.rows - img.rows % (pool_size * num_patchs_y));
+
+    // Crop the full image to that image contained by the rectangle myROI
+    // Note that this doesn't copy the data
+    cv::Mat features_crop_x = (*img_feature_x)(myROI);
+    cv::Mat features_crop_y = (*img_feature_y)(myROI);
+
+    // allocate space for features_patch
+    uint8_t features_patch_x[num_patchs_x][num_patchs_y][pool_size][pool_size];
+    uint8_t features_patch_y[num_patchs_x][num_patchs_y][pool_size][pool_size];
+
+    int16_t tmp_response[num_patchs_y][num_patchs_x];
+
+    // fill features_patch
+
+    // for each patch
+    for (int i_patch_y = 0; i_patch_y < num_patchs_y; ++i_patch_y)
+    {
+        for (int i_patch_x = 0; i_patch_x < num_patchs_x; ++i_patch_x)
+        {
+
+        }
+    }
+
+    // clip between 0 and 255
+    uint8_t response[num_patchs_y][num_patchs_x];
+    for (int i_patch_y = 0; i_patch_y < num_patchs_y; ++i_patch_y)
+    {
+        for (int i_patch_x = 0; i_patch_x < num_patchs_x; ++i_patch_x)
+        {
+            int16_t current_value = tmp_response[i_patch_y][i_patch_x];
+
+            if (current_value <= 0)
+                response[i_patch_y][i_patch_x] = 0;
+            else if (current_value <= 255)
+                response[i_patch_y][i_patch_x] = current_value;
+            else
+                response[i_patch_y][i_patch_x] = 255;
+
+        }
+    }
+
+
 }
 
 template<typename T>
