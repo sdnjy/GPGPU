@@ -82,12 +82,18 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
 
     // fill features_patch
 
-    // for each patch
-    for (int i_patch_y = 0; i_patch_y < num_patchs_y; ++i_patch_y)
-    {
-        for (int i_patch_x = 0; i_patch_x < num_patchs_x; ++i_patch_x)
-        {
+    // Allocate table of size heigth/pool_size * weight/pool_size
 
+    // for each patch
+    for (int i = 0; i < img.rows; ++i)
+    {
+        for (int j = 0; j < img.cols; ++j)
+        {
+            auto f_x = img_features_x->at<uint8_t>(i, j);
+            auto f_y = img_features_y->at<uint8_t>(i, j);
+
+            auto diff = f_x - f_y;
+            tmp_response[i % pool_size][j % pool_size] += diff
         }
     }
 
