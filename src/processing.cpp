@@ -119,7 +119,56 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
     }
 
     cv::Mat mat_response2(num_patchs_y, num_patchs_x, CV_8UC1, response);
-    cv::imwrite("mat_response_before_threshold.jpg", mat_response2);
+    cv::imwrite("mat_response_before_morpho.jpg", mat_response2);
+
+    // Make copy of response
+    uint8_t tmp_morpho[num_patchs_y][num_patchs_x];
+    memset(tmp_morpho, 0, sizeof(tmp_morpho));
+
+    // dilation
+    for (int i_patch_y = 1; i_patch_y < num_patchs_y - 1; ++i_patch_y)
+    {
+        for (int i_patch_x = 2; i_patch_x < num_patchs_x - 2; ++i_patch_x)
+        {
+            uint8_t max = 0;
+            //For each pixel (without padding) see if there is a 1 in the 3x5 surronding neighbours
+            for (int i_kernel = i_patch_y  - 1; i_kernel <= i_patch_y  + 1; ++i_kernel)
+            {
+                for (int j_kernel = i_patch_x - 2; j_kernel <= i_patch_x + 2; ++j_kernel)
+                {
+                    if (response[i_kernel][j_kernel] > max)
+                    {
+                        max = response[i_kernel][j_kernel];
+                    }
+                }
+            } 
+            tmp_morpho[i_patch_y][i_patch_x] = max;
+        }
+    }
+
+    // erosion
+    for (int i_patch_y = 1; i_patch_y < num_patchs_y - 1; ++i_patch_y)
+    {
+        for (int i_patch_x = 2; i_patch_x < num_patchs_x - 2; ++i_patch_x)
+        {
+            uint8_t min = 255;
+            for (int i_kernel = i_patch_y  - 1; i_kernel <= i_patch_y  + 1; ++i_kernel)
+            {
+                for (int j_kernel = i_patch_x - 2; j_kernel <= i_patch_x + 2; ++j_kernel)
+                {
+                    if (tmp_morpho[i_kernel][j_kernel] < min)
+                    {
+                        min = tmp_morpho[i_kernel][j_kernel];
+                    }
+                }
+            } 
+            response[i_patch_y][i_patch_x] = min;
+        }
+    }
+
+    cv::Mat mat_response_1(num_patchs_y, num_patchs_x, CV_8UC1, response);
+    cv::imwrite("mat_response_morphed.jpg", mat_response_1);
+
 
     // Use threshold to activate patch
     const uint8_t threshold = max_value / 2;
@@ -127,92 +176,11 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
     {
         for (int i_patch_x = 0; i_patch_x < num_patchs_x; ++i_patch_x)
         {
-            response[i_patch_y][i_patch_x] = 255 * (response[i_patch_y][i_patch_x] >= threshold);
+            response[i_patch_y][i_patch_x] = 255 * (response[i_patch_y][i_patch_x] > threshold);
         }
     }
-    
-
-
-    cv::Mat mat_response1(num_patchs_y, num_patchs_x, CV_8UC1, response);
-    cv::imwrite("mat_response_after_threshold.jpg", mat_response1);
-
-    // Make copy of response
-    uint8_t tmp_morpho[num_patchs_y][num_patchs_x];
-
-    // Use morpho to get better results
-    for (int i_patch_y = 1; i_patch_y < num_patchs_y - 1; ++i_patch_y)
-    {
-        for (int i_patch_x = 2; i_patch_x < num_patchs_x - 2; ++i_patch_x)
-        {
-            //For each pixel (without padding) see if there is a 1 in the 3x5 surronding neighbours
-            if (response[i_patch_y ][i_patch_x] == 255)
-            {
-                continue;
-            }
-
-            bool found_black = false;
-            for (int i_kernel = i_patch_y  - 1; i_kernel <= i_patch_y  + 1; ++i_kernel)
-            {
-                for (int j_kernel = i_patch_x - 2; j_kernel <= i_patch_x + 2; ++j_kernel)
-                {
-                    if (response[i_kernel][j_kernel] == 255)
-                    {
-                        tmp_morpho[i_patch_y][i_patch_x] = 255;
-                        found_black = true;
-                        break;
-                    }
-                }
-                if (found_black)
-                {
-                    break;
-                }
-            } 
-
-            if (!found_black)
-            {
-                tmp_morpho[i_patch_y][i_patch_x] = 0;
-            }
-        }
-    }
-
-    for (int i_patch_y = 1; i_patch_y < num_patchs_y - 1; ++i_patch_y)
-    {
-        for (int i_patch_x = 2; i_patch_x < num_patchs_x - 2; ++i_patch_x)
-        {
-            //For each pixel (without padding) see if there is a 1 in the 3x5 surronding neighbours
-            if (tmp_morpho[i_patch_y][i_patch_x] == 0)
-            {
-                continue;
-            }
-
-            bool found_white = false;
-            for (int i_kernel = i_patch_y  - 1; i_kernel <= i_patch_y  + 1; ++i_kernel)
-            {
-                for (int j_kernel = i_patch_x - 2; j_kernel <= i_patch_x + 2; ++j_kernel)
-                {
-                    if (tmp_morpho[i_kernel][j_kernel] == 0)
-                    {
-                        response[i_patch_y][i_patch_x] = 0;
-                        bool found_white = true;
-                        break;
-                    }
-                }
-                if (found_white)
-                {
-                    break;
-                }
-            } 
-
-            if (!found_white)
-            {
-                response[i_patch_y][i_patch_x] = 255;
-            }
-        }
-    }
-
 
     cv::Mat mat_response(num_patchs_y, num_patchs_x, CV_8UC1, response);
-
     cv::imwrite("mat_response.jpg", mat_response);
     delete img_features;
 
