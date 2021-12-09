@@ -74,8 +74,11 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
     cv::Mat features_crop_x = (*img_feature_x)(myROI);
     cv::Mat features_crop_y = (*img_feature_y)(myROI);
 
+    cv::imwrite("crop_totox.jpg", features_crop_x);
+    cv::imwrite("crop_totoy.jpg", features_crop_y);
+
     // Allocate table of size heigth/pool_size * weight/pool_size
-    int16_t tmp_response[num_patchs_y][num_patchs_x];
+    int16_t tmp_response[num_patchs_y][num_patchs_x] = {0};
 
     // fill features_patch
 
@@ -83,10 +86,10 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
     {
         for (int j = 0; j < features_crop_x.cols; ++j)
         {
-            auto f_x = features_crop_x.at<uint8_t>(i, j);
-            auto f_y = features_crop_y.at<uint8_t>(i, j);
+            int16_t f_x = features_crop_x.at<uint8_t>(i, j);
+            int16_t f_y = features_crop_y.at<uint8_t>(i, j);
 
-            auto diff = f_x - f_y;
+            int16_t diff = f_x - f_y;
             tmp_response[i / pool_size][j / pool_size] += diff;
         }
     }
@@ -114,6 +117,9 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         }
     }
 
+    cv::Mat mat_response2(num_patchs_y, num_patchs_x, CV_8UC1, response);
+    cv::imwrite("mat_response_before_threshold.jpg", mat_response2);
+
     // Use threshold to activate patch
     const uint8_t threshold = max_value / 2;
     for (int i_patch_y = 0; i_patch_y < num_patchs_y; ++i_patch_y)
@@ -123,6 +129,11 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
             response[i_patch_y][i_patch_x] = 255 * (response[i_patch_y][i_patch_x] >= threshold);
         }
     }
+    
+
+
+    cv::Mat mat_response1(num_patchs_y, num_patchs_x, CV_8UC1, response);
+    cv::imwrite("mat_response_after_threshold.jpg", mat_response1);
 
     // Make copy of response
     uint8_t tmp_morpho[num_patchs_y][num_patchs_x];
@@ -133,7 +144,7 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         for (int i_patch_x = 2; i_patch_x < num_patchs_x - 2; ++i_patch_x)
         {
             //For each pixel (without padding) see if there is a 1 in the 3x5 surronding neighbours
-            if (response[i_patch_y ][i_patch_x] == 1)
+            if (response[i_patch_y ][i_patch_x] == 255)
             {
                 continue;
             }
@@ -197,6 +208,7 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
             }
         }
     }
+
 
     cv::Mat mat_response(num_patchs_y, num_patchs_x, CV_8UC1, response);
 
