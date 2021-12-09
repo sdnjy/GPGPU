@@ -78,7 +78,8 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
     cv::imwrite("crop_totoy.jpg", features_crop_y);
 
     // Allocate table of size heigth/pool_size * weight/pool_size
-    int16_t tmp_response[num_patchs_y][num_patchs_x] = {0};
+    int16_t tmp_response[num_patchs_y][num_patchs_x];
+    memset(tmp_response, 0, sizeof(tmp_response));
 
     // fill features_patch
 
