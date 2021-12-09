@@ -74,11 +74,10 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
     cv::Mat features_crop_x = (*img_feature_x)(myROI);
     cv::Mat features_crop_y = (*img_feature_y)(myROI);
 
+    // Allocate table of size heigth/pool_size * weight/pool_size
     int16_t tmp_response[num_patchs_y][num_patchs_x];
 
     // fill features_patch
-
-    // Allocate table of size heigth/pool_size * weight/pool_size
 
     for (int i = 0; i < features_crop_x.rows; ++i)
     {
@@ -115,6 +114,7 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         }
     }
 
+    // Use threshold to activate patch
     const uint8_t threshold = max_value / 2;
     for (int i_patch_y = 0; i_patch_y < num_patchs_y; ++i_patch_y)
     {
@@ -124,7 +124,80 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         }
     }
 
-    
+    // Make copy of response
+    uint8_t tmp_morpho[num_patchs_y][num_patchs_x];
+
+    // Use morpho to get better results
+    for (int i_patch_y = 1; i_patch_y < num_patchs_y - 1; ++i_patch_y)
+    {
+        for (int i_patch_x = 2; i_patch_x < num_patchs_x - 2; ++i_patch_x)
+        {
+            //For each pixel (without padding) see if there is a 1 in the 3x5 surronding neighbours
+            if (response[i_patch_y ][i_patch_x] == 1)
+            {
+                continue;
+            }
+
+            bool found_black = false;
+            for (int i_kernel = i_patch_y  - 1; i_kernel <= i_patch_y  + 1; ++i_kernel)
+            {
+                for (int j_kernel = i_patch_x - 2; j_kernel <= i_patch_x + 2; ++j_kernel)
+                {
+                    if (response[i_kernel][j_kernel] == 255)
+                    {
+                        tmp_morpho[i_patch_y][i_patch_x] = 255;
+                        found_black = true;
+                        break;
+                    }
+                }
+                if (found_black)
+                {
+                    break;
+                }
+            } 
+
+            if (!found_black)
+            {
+                tmp_morpho[i_patch_y][i_patch_x] = 0;
+            }
+        }
+    }
+
+    for (int i_patch_y = 1; i_patch_y < num_patchs_y - 1; ++i_patch_y)
+    {
+        for (int i_patch_x = 2; i_patch_x < num_patchs_x - 2; ++i_patch_x)
+        {
+            //For each pixel (without padding) see if there is a 1 in the 3x5 surronding neighbours
+            if (tmp_morpho[i_patch_y][i_patch_x] == 0)
+            {
+                continue;
+            }
+
+            bool found_white = false;
+            for (int i_kernel = i_patch_y  - 1; i_kernel <= i_patch_y  + 1; ++i_kernel)
+            {
+                for (int j_kernel = i_patch_x - 2; j_kernel <= i_patch_x + 2; ++j_kernel)
+                {
+                    if (tmp_morpho[i_kernel][j_kernel] == 0)
+                    {
+                        response[i_patch_y][i_patch_x] = 0;
+                        bool found_white = true;
+                        break;
+                    }
+                }
+                if (found_white)
+                {
+                    break;
+                }
+            } 
+
+            if (!found_white)
+            {
+                response[i_patch_y][i_patch_x] = 255;
+            }
+        }
+    }
+
     cv::Mat mat_response(num_patchs_y, num_patchs_x, CV_8UC1, response);
 
     cv::imwrite("mat_response.jpg", mat_response);
