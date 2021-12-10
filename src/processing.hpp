@@ -7,10 +7,7 @@
 #include <opencv2/imgcodecs.hpp>
 
 
-#include "img_features.hpp"
-
-
-ImgFeatures* _compute_features(cv::Mat& img, const size_t width, const size_t height);
+void _compute_features(unsigned char* img, unsigned char* sobel_x, unsigned char* sobel_y, const size_t height, const size_t width);
 void image_to_features(std::string path, int scale_factor, int pool_size, int postproc_size);
 
 template<typename T>

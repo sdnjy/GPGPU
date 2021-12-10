@@ -1,19 +1,10 @@
 #include <iostream>
-
+#include <stdio.h>
 #include "processing.hpp"
-#include "img_features.hpp"
-#include "array.hpp"
 
 
-ImgFeatures* _compute_features(cv::Mat& img, const size_t height, const size_t width)
+void _compute_features(unsigned char* img, unsigned char* sobel_x, unsigned char* sobel_y, const size_t height, const size_t width)
 {
-    const int n_filters = 2;
-
-    ImgFeatures* img_features = new ImgFeatures(height, width, CV_8UC1);
-    cv::Mat* img_feature_x = img_features->img_feature_x;
-    cv::Mat* img_feature_y = img_features->img_feature_y;
-    
-    
     float sobelx[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
     float sobely[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
 
@@ -28,101 +19,91 @@ ImgFeatures* _compute_features(cv::Mat& img, const size_t height, const size_t w
             {
                 for (size_t j = 0; j < 3; ++j)
                 {
-                    auto img_current_pixel = img.at<uint8_t>(ii + i - 1, jj + j - 1);
+                    size_t id = (ii + i - 1) * width + (jj + j - 1);
+                    auto img_current_pixel = img[id];
                     sum_x += sobelx[i][j] * img_current_pixel;
                     sum_y += sobely[i][j] * img_current_pixel;
                 }
             }
             // sobel x
-            img_feature_x->at<uint8_t>(ii, jj) = abs<float>(sum_x);
+            size_t id_ = ii * width + jj;
+            sobel_x[id_] = abs<float>(sum_x);
             // sobel y
-            img_feature_y->at<uint8_t>(ii, jj) = abs<float>(sum_y);
+            sobel_y[id_] = abs<float>(sum_y);
         }
     }
-
-    return img_features;
 }
 
 // Crop image
-ImgFeatures* crop(ImgFeatures* img_feat, size_t num_patch_x, size_t num_patch_y, int pool_size)
+void crop(unsigned char* sobel_x, unsigned char* sobel_y, unsigned char* crop_x, unsigned char* crop_y, size_t rows, size_t cols, size_t base_col)
 {
-    // Get matrices from struct
-    cv::Mat* img_feature_x = img_feat->img_feature_x;
-    cv::Mat* img_feature_y = img_feat->img_feature_y;
-
-    // Calculate dim of cropped images
-    size_t width = img_feature_x->cols - img_feature_x->cols % (pool_size * num_patch_x);
-    size_t height = img_feature_x->rows - img_feature_x->rows % (pool_size * num_patch_y);
-
-    //Create arrays
-    ImgFeatures* crop_features = new ImgFeatures(height, width, CV_8UC1);
-    cv::Mat* crop_feature_x = crop_features->img_feature_x;
-    cv::Mat* crop_feature_y = crop_features->img_feature_y;
-
-    for (size_t i = 0; i < height; ++i)
+    for (size_t i = 0; i < rows; i++)
     {
-        for(size_t j = 0; j < width; ++j)
+        for (size_t j = 0; j < cols; j++)
         {
-            crop_feature_x->at<uint8_t>(i, j) = img_feature_x->at<uint8_t>(i, j);
-            crop_feature_y->at<uint8_t>(i, j) = img_feature_y->at<uint8_t>(i, j);
+            size_t id = i * cols + j;
+            size_t id_ = i * base_col + j;
+
+            crop_x[id] = sobel_x[id_];
+            crop_y[id] = sobel_y[id_];
         }
     }
-
-    // Delete old images
-    delete img_feat;
-
-    return crop_features;
 }
 
 // FIXME return features
 void image_to_features(std::string path, int scale_factor, int pool_size, int postproc_size)
 {
-    cv::Mat img = cv::imread(path, cv::IMREAD_GRAYSCALE);
-    if(img.empty())
+    // Using opencv to get image
+    cv::Mat mat_img = cv::imread(path, cv::IMREAD_GRAYSCALE);
+    if(mat_img.empty())
     {
         std::cerr << "Could not read the image" << std::endl;
         exit(1);
     }
 
-    ImgFeatures* img_features = _compute_features(img, img.rows, img.cols);
+    // No more cv::mat
+    size_t cols = mat_img.cols;
+    size_t rows = mat_img.rows;
+    unsigned char* img = mat_img.data;
+    unsigned char* sobel_x = (unsigned char*) calloc(cols * rows, sizeof(unsigned char));
+    unsigned char* sobel_y = (unsigned char*) calloc(cols * rows, sizeof(unsigned char));
 
-    size_t num_patchs_x = img.cols / pool_size;
-    size_t num_patchs_y = img.rows / pool_size;
+    // Check sobel images
+    //cv::imwrite("toto_base.jpg", cv::Mat (rows, cols, CV_8UC1, img));
 
-    //save both features
-    cv::imwrite("totox.jpg", *img_features->img_feature_x);
-    cv::imwrite("totoy.jpg", *img_features->img_feature_y);
+    _compute_features(img, sobel_x, sobel_y, rows, cols);
 
-    cv::Mat* img_feature_x = img_features->img_feature_x;
-    cv::Mat* img_feature_y = img_features->img_feature_y;
+    // Check sobel images
+    //cv::imwrite("totox.jpg", cv::Mat (rows, cols, CV_8UC1, sobel_x));
+    //cv::imwrite("totoy.jpg", cv::Mat (rows, cols, CV_8UC1, sobel_y));
 
-    // Setup a rectangle to define your region of interest for the crop
-    //cv::Rect myROI(0, 0, img.cols - img.cols % (pool_size * num_patchs_x), img.rows - img.rows % (pool_size * num_patchs_y));
-    // Crop the full image to that image contained by the rectangle myROI
-    // Note that this doesn't copy the data
-    //cv::Mat features_crop_x = (*img_feature_x)(myROI);
-    //cv::Mat features_crop_y = (*img_feature_y)(myROI);
+    // Calculate number of patchs
+    size_t num_patchs_x = cols / pool_size;
+    size_t num_patchs_y = rows / pool_size;
+    size_t crop_cols = cols - cols % (pool_size * num_patchs_x);
+    size_t crop_rows = rows - rows % (pool_size * num_patchs_y);
 
-    img_features = crop(img_features, num_patchs_x, num_patchs_y, pool_size);
+    unsigned char* crop_x = (unsigned char*) calloc(crop_cols * crop_rows, sizeof(unsigned char));
+    unsigned char* crop_y = (unsigned char*) calloc(crop_cols * crop_rows, sizeof(unsigned char));
 
-    cv::Mat features_crop_x = *img_features->img_feature_x;
-    cv::Mat features_crop_y = *img_features->img_feature_y;
+    crop(sobel_x, sobel_y, crop_x, crop_y, crop_rows, crop_cols, cols);
 
-    cv::imwrite("crop_totox.jpg", features_crop_x);
-    cv::imwrite("crop_totoy.jpg", features_crop_y);
+    //cv::imwrite("crop_totox.jpg", cv::Mat (crop_rows, crop_cols, CV_8UC1, crop_x));
+    //cv::imwrite("crop_totoy.jpg", cv::Mat (crop_rows, crop_cols, CV_8UC1, crop_y));
+
 
     // Allocate table of size heigth/pool_size * weight/pool_size
     int tmp_response[num_patchs_y][num_patchs_x];
     memset(tmp_response, 0, sizeof(tmp_response));
 
     // fill features_patch
-
-    for (int i = 0; i < features_crop_x.rows; ++i)
+    for (int i = 0; i < crop_rows; ++i)
     {
-        for (int j = 0; j < features_crop_x.cols; ++j)
+        for (int j = 0; j < crop_cols; ++j)
         {
-            int f_x = features_crop_x.at<uint8_t>(i, j);
-            int f_y = features_crop_y.at<uint8_t>(i, j);
+            size_t id = i * crop_cols + j;
+            int f_x = crop_x[id];
+            int f_y = crop_y[id];
 
             int diff = f_x - f_y;
             tmp_response[i / pool_size][j / pool_size] += diff;
@@ -152,8 +133,7 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         }
     }
 
-    cv::Mat mat_response2(num_patchs_y, num_patchs_x, CV_8UC1, response);
-    cv::imwrite("mat_response_before_morpho.jpg", mat_response2);
+    //cv::imwrite("mat_response_before_morpho.jpg", cv::Mat(num_patchs_y, num_patchs_x, CV_8UC1, response));
 
     // Make copy of response
     uint8_t tmp_morpho[num_patchs_y][num_patchs_x];
@@ -200,8 +180,7 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         }
     }
 
-    cv::Mat mat_response_1(num_patchs_y, num_patchs_x, CV_8UC1, response);
-    cv::imwrite("mat_response_morphed.jpg", mat_response_1);
+    //cv::imwrite("mat_response_morphed.jpg", cv::Mat(num_patchs_y, num_patchs_x, CV_8UC1, response));
 
 
     // Use threshold to activate patch
@@ -214,10 +193,13 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         }
     }
 
-    cv::Mat mat_response(num_patchs_y, num_patchs_x, CV_8UC1, response);
-    cv::imwrite("mat_response.jpg", mat_response);
-    delete img_features;
+    cv::imwrite("Barcode.jpg", cv::Mat(num_patchs_y, num_patchs_x, CV_8UC1, response));
 
+    // Free all allocations
+    free(sobel_x);
+    free(sobel_y);
+    free(crop_x);
+    free(crop_y);
 }
 
 template<typename T>
