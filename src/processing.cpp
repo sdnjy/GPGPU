@@ -5,11 +5,11 @@
 #include "array.hpp"
 
 
-ImgFeatures* _compute_features(cv::Mat& img, const size_t width, const size_t height)
+ImgFeatures* _compute_features(cv::Mat& img, const size_t height, const size_t width)
 {
     const int n_filters = 2;
 
-    ImgFeatures* img_features = new ImgFeatures(width, height, CV_8UC1);
+    ImgFeatures* img_features = new ImgFeatures(height, width, CV_8UC1);
     cv::Mat* img_feature_x = img_features->img_feature_x;
     cv::Mat* img_feature_y = img_features->img_feature_y;
     
@@ -17,9 +17,9 @@ ImgFeatures* _compute_features(cv::Mat& img, const size_t width, const size_t he
     float sobelx[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
     float sobely[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
 
-    for (size_t ii = 1; ii < width - 1; ++ii)
+    for (size_t ii = 1; ii < height - 1; ++ii)
     {
-        for (size_t jj = 1; jj < height - 1; ++jj)
+        for (size_t jj = 1; jj < width - 1; ++jj)
         {
             float sum_x = 0;
             float sum_y = 0;
@@ -43,6 +43,37 @@ ImgFeatures* _compute_features(cv::Mat& img, const size_t width, const size_t he
     return img_features;
 }
 
+// Crop image
+ImgFeatures* crop(ImgFeatures* img_feat, size_t num_patch_x, size_t num_patch_y, int pool_size)
+{
+    // Get matrices from struct
+    cv::Mat* img_feature_x = img_feat->img_feature_x;
+    cv::Mat* img_feature_y = img_feat->img_feature_y;
+
+    // Calculate dim of cropped images
+    size_t width = img_feature_x->cols - img_feature_x->cols % (pool_size * num_patch_x);
+    size_t height = img_feature_x->rows - img_feature_x->rows % (pool_size * num_patch_y);
+
+    //Create arrays
+    ImgFeatures* crop_features = new ImgFeatures(height, width, CV_8UC1);
+    cv::Mat* crop_feature_x = crop_features->img_feature_x;
+    cv::Mat* crop_feature_y = crop_features->img_feature_y;
+
+    for (size_t i = 0; i < height; ++i)
+    {
+        for(size_t j = 0; j < width; ++j)
+        {
+            crop_feature_x->at<uint8_t>(i, j) = img_feature_x->at<uint8_t>(i, j);
+            crop_feature_y->at<uint8_t>(i, j) = img_feature_y->at<uint8_t>(i, j);
+        }
+    }
+
+    // Delete old images
+    delete img_feat;
+
+    return crop_features;
+}
+
 // FIXME return features
 void image_to_features(std::string path, int scale_factor, int pool_size, int postproc_size)
 {
@@ -62,17 +93,20 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
     cv::imwrite("totox.jpg", *img_features->img_feature_x);
     cv::imwrite("totoy.jpg", *img_features->img_feature_y);
 
-    
     cv::Mat* img_feature_x = img_features->img_feature_x;
     cv::Mat* img_feature_y = img_features->img_feature_y;
 
     // Setup a rectangle to define your region of interest for the crop
-    cv::Rect myROI(0, 0, img.cols - img.cols % (pool_size * num_patchs_x), img.rows - img.rows % (pool_size * num_patchs_y));
-
+    //cv::Rect myROI(0, 0, img.cols - img.cols % (pool_size * num_patchs_x), img.rows - img.rows % (pool_size * num_patchs_y));
     // Crop the full image to that image contained by the rectangle myROI
     // Note that this doesn't copy the data
-    cv::Mat features_crop_x = (*img_feature_x)(myROI);
-    cv::Mat features_crop_y = (*img_feature_y)(myROI);
+    //cv::Mat features_crop_x = (*img_feature_x)(myROI);
+    //cv::Mat features_crop_y = (*img_feature_y)(myROI);
+
+    img_features = crop(img_features, num_patchs_x, num_patchs_y, pool_size);
+
+    cv::Mat features_crop_x = *img_features->img_feature_x;
+    cv::Mat features_crop_y = *img_features->img_feature_y;
 
     cv::imwrite("crop_totox.jpg", features_crop_x);
     cv::imwrite("crop_totoy.jpg", features_crop_y);
