@@ -21,8 +21,8 @@ int main() {
     int postproc_size = 5;
 
 
-    const std::string input_dir_path = "../input_images/";
-    const std::string output_dir_path = "../output_images/";
+    const std::string input_dir_path = "../../input_images/";
+    const std::string output_dir_path = "../../output_images/";
 
     for (const auto& entry : std::filesystem::directory_iterator(input_dir_path))
     {
