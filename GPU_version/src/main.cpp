@@ -3,7 +3,7 @@
 #include <opencv2/highgui.hpp>
 
 #include <iostream>
-#include <filesystem>
+#include <experimental/filesystem>
 
 #include "processing.hpp"
 
@@ -14,17 +14,15 @@ TODO:
 */
 
 int main() {
-    std::string path = "../collective_database/PXL_20211101_175643604.jpg";
-
-    int scale_factor = 1;
-    int pool_size = 31;
-    int postproc_size = 5;
+    const int scale_factor = 1;
+    const int pool_size = 31;
+    const int postproc_size = 5;
 
 
     const std::string input_dir_path = "../../input_images/";
     const std::string output_dir_path = "../../output_images/";
 
-    for (const auto& entry : std::filesystem::directory_iterator(input_dir_path))
+    for (const auto& entry : std::experimental::filesystem::directory_iterator(input_dir_path))
     {
         const std::string image_path = entry.path();
         const int i_start_image_name = image_path.find_last_of("/") + 1;
