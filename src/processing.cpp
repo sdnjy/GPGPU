@@ -51,7 +51,7 @@ void crop(unsigned char* sobel_x, unsigned char* sobel_y, unsigned char* crop_x,
 }
 
 // FIXME return features
-void image_to_features(std::string path, int scale_factor, int pool_size, int postproc_size)
+void image_to_features(std::string path, const int scale_factor, const int pool_size, const int postproc_size, const std::string output_path)
 {
     // Using opencv to get image
     cv::Mat mat_img = cv::imread(path, cv::IMREAD_GRAYSCALE);
@@ -193,7 +193,7 @@ void image_to_features(std::string path, int scale_factor, int pool_size, int po
         }
     }
 
-    cv::imwrite("Barcode.jpg", cv::Mat(num_patchs_y, num_patchs_x, CV_8UC1, response));
+    cv::imwrite(output_path, cv::Mat(num_patchs_y, num_patchs_x, CV_8UC1, response));
 
     // Free all allocations
     free(sobel_x);
