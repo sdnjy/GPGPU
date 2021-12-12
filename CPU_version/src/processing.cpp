@@ -119,7 +119,7 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     {
         for (int i_patch_x = 0; i_patch_x < num_patchs_x; ++i_patch_x)
         {
-            int16_t current_value = tmp_response[i_patch_y][i_patch_x] / pool_size_squared;
+            int current_value = tmp_response[i_patch_y][i_patch_x] / pool_size_squared;
 
             if (current_value <= 0)
                 response[i_patch_y][i_patch_x] = 0;
