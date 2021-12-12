@@ -7,13 +7,13 @@ __global__ void compute_features(unsigned char* img, unsigned char* sobel_x, uns
                                 const size_t width, const size_t height)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-
-    float sum_x = 0;
-    float sum_y = 0;
     int size = width * height;
 
     while (id < size)
     {
+        float sum_x = 0;
+        float sum_y = 0;
+
         // Padding on border
         if (id <= width || id >= width * (height - 1) 
             || id % width == 0 || id % width == width - 1 )
