@@ -70,7 +70,7 @@ __global__ void crop(unsigned char* sobel_x, unsigned char* sobel_y, unsigned ch
 
 // Fill patches with mean features
 __global__ void fill(int* int_response,  unsigned char* crop_x, unsigned char* crop_y, const int pool_size, 
-                    const size_t width, const size_t height, const size_t num_patchs_y)
+                    const size_t width, const size_t height, const size_t num_patchs_x)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int size = width * height;
@@ -80,7 +80,7 @@ __global__ void fill(int* int_response,  unsigned char* crop_x, unsigned char* c
         // Get i and j (not very efficient)
         int i = id / width;
         int j = id % width;
-        int tmp_id = (i / pool_size) * num_patchs_y + (j / pool_size);
+        int tmp_id = (i / pool_size) * num_patchs_x + (j / pool_size);
 
         int diff = crop_x[id] - crop_y[id];
 
@@ -173,7 +173,7 @@ __global__ void morpho(unsigned char* tmp_morpho, unsigned char* response, const
     }
 }
 
-__global__ threshold(unsigned char *response, uint8_t threshold, const size_t width, const size_t height)
+__global__ void threshold(unsigned char *response, uint8_t threshold, const size_t width, const size_t height)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int size = width * height;
@@ -219,21 +219,24 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     cudaMemcpy(sobely_gpu, sobel_y, img_size, cudaMemcpyHostToDevice);
 
     // Check images
-    cv::imwrite("toto_base.jpg", cv::Mat (rows, cols, CV_8UC1, img));
+    //cv::imwrite("toto_base.jpg", cv::Mat (rows, cols, CV_8UC1, img));
+
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
 
     // Initialize thread
-    int blockSize = 10;
-    int gridSize = 20;
+    int blockSize = 1024;
+    int gridSize = 65535;
 
     // Compute Sobel
-    compute_features<<<gridSize, blockSize>>>(img_gpu, sobelx_gpu, sobely_gpu, rows, cols);
+    compute_features<<<gridSize, blockSize>>>(img_gpu, sobelx_gpu, sobely_gpu, cols, rows);
     cudaDeviceSynchronize();
 
     // Check sobel images
-    cudaMemcpy(sobel_x, sobelx_gpu, img_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(sobel_y, sobely_gpu, img_size, cudaMemcpyDeviceToHost);
-    cv::imwrite("totox.jpg", cv::Mat (rows, cols, CV_8UC1, sobel_x));
-    cv::imwrite("totoy.jpg", cv::Mat (rows, cols, CV_8UC1, sobel_y));
+    //cudaMemcpy(sobel_x, sobelx_gpu, img_size, cudaMemcpyDeviceToHost);
+    //cudaMemcpy(sobel_y, sobely_gpu, img_size, cudaMemcpyDeviceToHost);
+    //cv::imwrite("totox.jpg", cv::Mat (rows, cols, CV_8UC1, sobel_x));
+    //cv::imwrite("totoy.jpg", cv::Mat (rows, cols, CV_8UC1, sobel_y));
 
     // Calculate number of patchs
     size_t num_patchs_x = cols / pool_size;
@@ -257,32 +260,47 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
 
     // Crop images
     int diff_width = cols - crop_cols;
-    crop<<<gridSize, blockSize>>>(sobelx_gpu, sobely_gpu, cropx_gpu, cropy_gpu, crop_rows, crop_cols, diff_width);
+    crop<<<gridSize, blockSize>>>(sobelx_gpu, sobely_gpu, cropx_gpu, cropy_gpu, crop_cols, crop_rows, diff_width);
     cudaDeviceSynchronize();
 
     // Check crop
     cudaMemcpy(crop_x, cropx_gpu, img_size, cudaMemcpyDeviceToHost);
     cudaMemcpy(crop_y, cropy_gpu, img_size, cudaMemcpyDeviceToHost);
-    cv::imwrite("crop_totox.jpg", cv::Mat (crop_rows, crop_cols, CV_8UC1, crop_x));
-    cv::imwrite("crop_totoy.jpg", cv::Mat (crop_rows, crop_cols, CV_8UC1, crop_y));
+    //cv::imwrite("crop_totox.jpg", cv::Mat (crop_rows, crop_cols, CV_8UC1, crop_x));
+    //cv::imwrite("crop_totoy.jpg", cv::Mat (crop_rows, crop_cols, CV_8UC1, crop_y));
 
-    int *int_response = (int*) calloc(num_patchs_y * num_patchs_x, sizeof(int));
-    unsigned char *response = (unsigned char*) calloc(num_patchs_y * num_patchs_x, sizeof(unsigned char));
+    int* int_response = (int*) calloc(num_patchs_y * num_patchs_x, sizeof(int));
+    unsigned char* response = (unsigned char*) calloc(num_patchs_y * num_patchs_x, sizeof(unsigned char));
     
     // Malloc for GPU
     img_size = num_patchs_y * num_patchs_x;
-    int *int_resp_gpu;
-    unsigned char *resp_gpu;
+    int* int_resp_gpu;
+    unsigned char* resp_gpu;
     
     cudaMalloc(&int_resp_gpu, img_size * sizeof(int));
     cudaMalloc(&resp_gpu, img_size * sizeof(unsigned char));
 
-    cudaMemcpy(int_resp_gpu, int_response, img_size * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(resp_gpu, response, img_size * sizeof(unsigned char), cudaMemcpyHostToDevice);
 
     // Fill patches with mean sobel differences
-    fill<<<gridSize, blockSize>>>(int_resp_gpu,  cropx_gpu, cropy_gpu, pool_size, crop_cols, crop_rows, num_patchs_y);
-    cudaDeviceSynchronize();
+    //fill<<<gridSize, blockSize>>>(int_resp_gpu,  cropx_gpu, cropy_gpu, pool_size, crop_cols, crop_rows, num_patchs_x);
+    //cudaDeviceSynchronize();
+    for (int i = 0; i < crop_rows; ++i)
+    {
+        for (int j = 0; j < crop_cols; ++j)
+        {
+            size_t id = i * crop_cols + j;
+            int f_x = crop_x[id];
+            int f_y = crop_y[id];
+
+            int diff = f_x - f_y;
+            int_response[(i / pool_size) * num_patchs_x + j / pool_size] += diff;
+        }
+    }
+
+    // For clip
+    cudaMemcpy(int_resp_gpu, int_response, img_size * sizeof(int), cudaMemcpyHostToDevice);
+
 
     // Clip values
     const int pool_size_squared = pool_size * pool_size;
@@ -293,7 +311,7 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     cudaMemcpy(response, resp_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
 
     // Check clip
-    cv::imwrite("clip_toto.jpg", cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
+    //cv::imwrite("clip_toto.jpg", cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
 
     // Get max value
     uint8_t max_value = 0;
@@ -315,20 +333,28 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     morpho<<<gridSize, blockSize>>>(morpho_gpu, resp_gpu, num_patchs_x,  num_patchs_y, true);
     cudaDeviceSynchronize();
 
+    // check dilation
+    //cudaMemcpy(tmp_morpho, morpho_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    //cv::imwrite("check_dilation.jpg", cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, tmp_morpho));
+
     // Apply morpho erosion
     morpho<<<gridSize, blockSize>>>(resp_gpu, morpho_gpu, num_patchs_x,  num_patchs_y, false);
     cudaDeviceSynchronize();
 
+    // check erosion
+    //cudaMemcpy(response, resp_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    //cv::imwrite("check_erosion.jpg", cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
+
     // Apply threshold
-    uint8_t threshold = max_value / 2;
-    threshodld<<<gridSize, blockSize>>>(resp_gpu, threshold, num_patchs_x,  num_patchs_y);
+    const uint8_t thresh = max_value / 2;
+    threshold<<<gridSize, blockSize>>>(resp_gpu, thresh, num_patchs_x,  num_patchs_y);
     cudaDeviceSynchronize();
 
     // Get response back to CPU
     cudaMemcpy(response, resp_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
 
     // Check final barcode prediction
-    cv::imwrite("barcode.jpg", cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
+    cv::imwrite(output_path, cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
 
     // Free all allocations
     free(sobel_x);
