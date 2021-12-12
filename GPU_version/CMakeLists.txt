@@ -10,7 +10,8 @@ set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++17" )
 
 
 file(GLOB main_SRC
-    "src/*.cpp"
+    "src/*.cu"
+    "src/main.cpp"
 )
 
 cuda_add_executable(main ${main_SRC})

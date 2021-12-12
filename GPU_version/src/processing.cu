@@ -99,7 +99,7 @@ __global__ void clip(int* int_response, unsigned char* response, const size_t wi
                     const size_t height, const int pool_size_squared)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-    int size = width * height
+    int size = width * height;
 
     while (id < size)
     {
@@ -121,7 +121,7 @@ __global__ void morpho(unsigned char* tmp_morpho, unsigned char* response, const
                         const size_t height, bool dilation)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-    int size = width * height
+    int size = width * height;
 
     while (id < size)
     {
@@ -148,14 +148,14 @@ __global__ void morpho(unsigned char* tmp_morpho, unsigned char* response, const
             {
                 for (int j = -2; j <= 2; ++j)
                 {
-                    int tmp_id = id + (i * width) + j);
+                    int tmp_id = id + (i * width) + j;
 
                     if (dilation)
                     {
                         // Search maximum
                         if (response[tmp_id] > best)
                         {
-                            best = response[tmp_id]
+                            best = response[tmp_id];
                         }
                     }
                     else
@@ -163,7 +163,7 @@ __global__ void morpho(unsigned char* tmp_morpho, unsigned char* response, const
                         // Search minimum
                         if (response[tmp_id] < best)
                         {
-                            best = response[tmp_id]
+                            best = response[tmp_id];
                         }
                     }
                     
@@ -217,7 +217,6 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     // Initialize thread
     int blockSize = 10;
     int gridSize = 20;
-    int thread_block_size = blockSize * gridSize;
 
     // Compute Sobel
     compute_features<<<gridSize, blockSize>>>(img_gpu, sobelx_gpu, sobely_gpu, rows, cols);
@@ -284,14 +283,14 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     cudaDeviceSynchronize();
 
     // Return response in CPU
-    cudaMemcpy(response, response_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    cudaMemcpy(response, resp_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
 
     // Check clip
     cv::imwrite("clip_toto.jpg", cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
 
     // Get max value
     int max_value = 0;
-    for (int i = 0; i < num_patchs_y * num_patchs_x); ++i)
+    for (int i = 0; i < num_patchs_y * num_patchs_x; ++i)
     {
         if (max_value < response[i])
         {
@@ -306,15 +305,15 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     cudaMemcpy(morpho_gpu, tmp_morpho, img_size * sizeof(unsigned char), cudaMemcpyHostToDevice);
 
     // Apply morpho dilation
-    morpho<<<gridSize, blockSize>>>(morpho_gpu, resp_gpu, num_patchs_x,  num_patchs_y, true)
+    morpho<<<gridSize, blockSize>>>(morpho_gpu, resp_gpu, num_patchs_x,  num_patchs_y, true);
     cudaDeviceSynchronize();
 
     // Apply morpho erosion
-    morpho<<<gridSize, blockSize>>>(resp_gpu, morpho_gpu, num_patchs_x,  num_patchs_y, false)
+    morpho<<<gridSize, blockSize>>>(resp_gpu, morpho_gpu, num_patchs_x,  num_patchs_y, false);
     cudaDeviceSynchronize();
 
     // Get response back to CPU
-    cudaMemcpy(response, response_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    cudaMemcpy(response, resp_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
 
     // Check final barcode prediction
     cv::imwrite("barcode.jpg", cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
