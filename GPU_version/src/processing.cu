@@ -53,18 +53,13 @@ __global__ void crop(unsigned char* sobel_x, unsigned char* sobel_y, unsigned ch
                     const size_t width, const size_t height, size_t diff_width)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-    int count_border = 0;
     int size = width * height;
 
     while (id < size)
     {
-        int id_ = id + count_border * diff_width;
+        int id_ = id + (id / width) * diff_width;
 
         // If true then we need to skip all remaining pixel of this line (crop occurs)
-        if (id / width > count_border)
-        {
-            count_border += 1;
-        }
 
         crop_x[id] = sobel_x[id_];
         crop_y[id] = sobel_y[id_];
@@ -174,6 +169,18 @@ __global__ void morpho(unsigned char* tmp_morpho, unsigned char* response, const
             tmp_morpho[id] = best;
         }
         
+        id += blockDim.x * gridDim.x;
+    }
+}
+
+__global__ threshold(unsigned char *response, uint8_t threshold, const size_t width, const size_t height)
+{
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    int size = width * height;
+
+    while (id < size)
+    {
+        response[id] = 255 * (response[id] > threshold);
         id += blockDim.x * gridDim.x;
     }
 }
@@ -289,7 +296,7 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     cv::imwrite("clip_toto.jpg", cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
 
     // Get max value
-    int max_value = 0;
+    uint8_t max_value = 0;
     for (int i = 0; i < num_patchs_y * num_patchs_x; ++i)
     {
         if (max_value < response[i])
@@ -310,6 +317,11 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
 
     // Apply morpho erosion
     morpho<<<gridSize, blockSize>>>(resp_gpu, morpho_gpu, num_patchs_x,  num_patchs_y, false);
+    cudaDeviceSynchronize();
+
+    // Apply threshold
+    uint8_t threshold = max_value / 2;
+    threshodld<<<gridSize, blockSize>>>(resp_gpu, threshold, num_patchs_x,  num_patchs_y);
     cudaDeviceSynchronize();
 
     // Get response back to CPU
