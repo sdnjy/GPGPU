@@ -1,7 +1,6 @@
-#include processing.hpp
+#include "processing.hpp"
 #include <iostream>
 #include <stdio.h>
-
 
 //Compute feature GPU
 __global__ void compute_features(unsigned char* img, unsigned char* sobel_x, unsigned char* sobel_y, 
@@ -11,41 +10,42 @@ __global__ void compute_features(unsigned char* img, unsigned char* sobel_x, uns
 
     float sum_x = 0;
     float sum_y = 0;
+    int size = width * height;
 
-    while (id < width * height)
+    while (id < size)
     {
         // Padding on border
-        if (id <= width || id % width == 0)
+        if (id <= width || id >= width * (height - 1) 
+            || id % width == 0 || id % width == width - 1 )
         {
             // Do nothing
         }
         else
         {
             // Calculate sobel x
-            sum_x += -1 * img[id - width - 1]
-            sum_x += 1 * img[id - width + 1]
-            sum_x += -2 * img[id - 1]
-            sum_x += 2 * img[id + 1]
-            sum_x += -1 * img[id + width - 1]
-            sum_x += 1 * img[id + width + 1]
+            sum_x += -1 * img[id - width - 1];
+            sum_x += 1 * img[id - width + 1];
+            sum_x += -2 * img[id - 1];
+            sum_x += 2 * img[id + 1];
+            sum_x += -1 * img[id + width - 1];
+            sum_x += 1 * img[id + width + 1];
 
             // Calculate sobel y
-            sum_y += -1 * img[id - width - 1]
-            sum_y += -2 * img[id - width]
-            sum_y += -1 * img[id - width + 1]
-            sum_y += 1 * img[id + width - 1]
-            sum_y += 2 * img[id + width]
-            sum_y += 1 * img[id + width + 1]
+            sum_y += -1 * img[id - width - 1];
+            sum_y += -2 * img[id - width];
+            sum_y += -1 * img[id - width + 1];
+            sum_y += 1 * img[id + width - 1];
+            sum_y += 2 * img[id + width];
+            sum_y += 1 * img[id + width + 1];
 
             // Apply kernel
-            sobel_x[id] = (sum_x > 0) ? sum_x : 0;
-            sobel_y[id] = (sum_y > 0) ? sum_y : 0;
+            sobel_x[id] = (sum_x > 0) ? sum_x : -sum_x;
+            sobel_y[id] = (sum_y > 0) ? sum_y : -sum_y;
         }
 
         // Go to next pixel to treat by this thread
         id += blockDim.x * gridDim.x;
     }
-
 }
 
 // Crop the image using GPU
@@ -53,11 +53,12 @@ __global__ void crop(unsigned char* sobel_x, unsigned char* sobel_y, unsigned ch
                     const size_t width, const size_t height, size_t diff_width)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-    int count_border = 0
+    int count_border = 0;
+    int size = width * height;
 
-    while (id < rows * cols)
+    while (id < size)
     {
-        id_ = id + count_border * diff_width;
+        int id_ = id + count_border * diff_width;
 
         // If true then we need to skip all remaining pixel of this line (crop occurs)
         if (id / width > count_border)
@@ -77,7 +78,7 @@ __global__ void fill(int* int_response,  unsigned char* crop_x, unsigned char* c
                     const size_t width, const size_t height, const size_t num_patchs_y)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-    int size = width * height
+    int size = width * height;
 
     while (id < size)
     {
@@ -190,9 +191,9 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     }
 
     // No more cv::mat
-    size_t img_size = cols * rows * sizeof(unsigned char);
     size_t cols = mat_img.cols;
     size_t rows = mat_img.rows;
+    size_t img_size = cols * rows * sizeof(unsigned char);
     unsigned char *img = mat_img.data;
     unsigned char *sobel_x = (unsigned char*) calloc(cols * rows, sizeof(unsigned char));
     unsigned char *sobel_y = (unsigned char*) calloc(cols * rows, sizeof(unsigned char));
@@ -219,7 +220,7 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     int thread_block_size = blockSize * gridSize;
 
     // Compute Sobel
-    compute_features<<<gridSize, blockSize>>>(img_gpu, sobelx_gpu, sobely_gpu, rows, cols, thread_block_size);
+    compute_features<<<gridSize, blockSize>>>(img_gpu, sobelx_gpu, sobely_gpu, rows, cols);
     cudaDeviceSynchronize();
 
     // Check sobel images
@@ -250,7 +251,7 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
 
     // Crop images
     int diff_width = cols - crop_cols;
-    crop<<<gridSize, blockSize>>>(sobelx_gpu, sobely_gpu, cropx_gpu, cropy_gpu, crop_rows, crop_cols, diff_width, thread_block_size);
+    crop<<<gridSize, blockSize>>>(sobelx_gpu, sobely_gpu, cropx_gpu, cropy_gpu, crop_rows, crop_cols, diff_width);
     cudaDeviceSynchronize();
 
     // Check crop
@@ -307,7 +308,7 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     // Apply morpho dilation
     morpho<<<gridSize, blockSize>>>(morpho_gpu, resp_gpu, num_patchs_x,  num_patchs_y, true)
     cudaDeviceSynchronize();
-    
+
     // Apply morpho erosion
     morpho<<<gridSize, blockSize>>>(resp_gpu, morpho_gpu, num_patchs_x,  num_patchs_y, false)
     cudaDeviceSynchronize();
