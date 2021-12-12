@@ -1,6 +1,5 @@
 #include <iostream>
 #include <stdio.h>
-#include "processing.hpp"
 
 
 void _compute_features(unsigned char* img, unsigned char* sobel_x, unsigned char* sobel_y, const size_t height, const size_t width)
