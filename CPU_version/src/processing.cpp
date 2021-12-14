@@ -193,7 +193,21 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
         }
     }
 
-    cv::imwrite(output_path, cv::Mat(num_patchs_y, num_patchs_x, CV_8UC1, response));
+    // Previous finish line
+    //cv::imwrite(output_path, cv::Mat(num_patchs_y, num_patchs_x, CV_8UC1, response));
+
+    // Resize picture
+    for (int i = 0; i < crop_rows; ++i)
+    {
+        for (int j = 0; j < crop_cols; ++j)
+        {
+            int id = i * crop_cols + j; 
+
+            crop_x[id] = response[i / pool_size][j / pool_size];
+        }
+    }
+
+    cv::imwrite(output_path, cv::Mat(crop_rows, crop_cols, CV_8UC1, crop_x));
 
     // Free all allocations
     free(sobel_x);
