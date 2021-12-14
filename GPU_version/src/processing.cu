@@ -70,21 +70,25 @@ __global__ void crop(unsigned char* sobel_x, unsigned char* sobel_y, unsigned ch
 
 // Fill patches with mean features
 __global__ void fill(int* int_response,  unsigned char* crop_x, unsigned char* crop_y, const int pool_size, 
-                    const size_t width, const size_t height, const size_t num_patchs_x)
+                    const size_t width, const size_t height)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int size = width * height;
+    int sum = 0;
 
     while (id < size)
     {
-        // Get i and j (not very efficient)
-        int i = id / width;
-        int j = id % width;
-        int tmp_id = (i / pool_size) * num_patchs_x + (j / pool_size);
+        for (int i = 0; i < pool_size; ++i)
+        {
+            for (int j = 0; j < pool_size; ++j)
+            {
+                int id_ = [(id + i) + j * width];
 
-        int diff = crop_x[id] - crop_y[id];
+                sum += crop_x[id] - crop_y[id];
+            }
+        }
 
-        int_response[tmp_id] += diff;
+        int_response[id] = sum;
         id += blockDim.x * gridDim.x;
     }
 }
@@ -302,8 +306,9 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     cudaMemcpy(resp_gpu, response, img_size * sizeof(unsigned char), cudaMemcpyHostToDevice);
 
     // Fill patches with mean sobel differences
-    //fill<<<gridSize, blockSize>>>(int_resp_gpu,  cropx_gpu, cropy_gpu, pool_size, crop_cols, crop_rows, num_patchs_x);
+    //fill<<<gridSize, blockSize>>>(int_resp_gpu,  cropx_gpu, cropy_gpu, pool_size, num_patchs_x, num_patchs_y);
     //cudaDeviceSynchronize();
+
     for (int i = 0; i < crop_rows; ++i)
     {
         for (int j = 0; j < crop_cols; ++j)
