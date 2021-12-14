@@ -185,6 +185,25 @@ __global__ void threshold(unsigned char *response, uint8_t threshold, const size
     }
 }
 
+__global__ void resize(unsigned char *response, unsigned char *crop_x, const size_t width, const size_t height, 
+                        const size_t num_patchs_x, const size_t pool_size)
+{
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    int size = width * height;
+
+    while (id < size)
+    {
+        // Get i and j (not very efficient)
+        int i = id / width;
+        int j = id % width;
+        int patch_id = (i / pool_size) * num_patchs_x + (j / pool_size);
+
+        crop_x[id] = response[patch_id];
+
+        id += blockDim.x * gridDim.x;
+    }
+}
+
 // Main function (will need refacto)
 void image_to_features(std::string path, const int scale_factor, const int pool_size,
                         const int postproc_size, const std::string output_path)
@@ -350,11 +369,17 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     threshold<<<gridSize, blockSize>>>(resp_gpu, thresh, num_patchs_x,  num_patchs_y);
     cudaDeviceSynchronize();
 
+    // Check response before resize
+    //cudaMemcpy(response, resp_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+
+    resize<<<gridSize, blockSize>>>(resp_gpu, cropx_gpu, crop_cols, crop_rows, num_patchs_x, pool_size);
+    cudaDeviceSynchronize();
+
     // Get response back to CPU
-    cudaMemcpy(response, resp_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    cudaMemcpy(crop_x, cropx_gpu, crop_cols * crop_rows * sizeof(unsigned char), cudaMemcpyDeviceToHost);
 
     // Check final barcode prediction
-    cv::imwrite(output_path, cv::Mat (num_patchs_y, num_patchs_x, CV_8UC1, response));
+    cv::imwrite(output_path, cv::Mat (crop_rows, crop_cols, CV_8UC1, crop_x));
 
     // Free all allocations
     free(sobel_x);
