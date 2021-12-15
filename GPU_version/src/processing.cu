@@ -82,9 +82,9 @@ __global__ void fill(int* int_response,  unsigned char* crop_x, unsigned char* c
         {
             for (int j = 0; j < pool_size; ++j)
             {
-                int id_ = [(id + i) + j * width];
+                int id_ = (id + i) + j * width;
 
-                sum += crop_x[id] - crop_y[id];
+                sum += crop_x[id_] - crop_y[id_];
             }
         }
 
