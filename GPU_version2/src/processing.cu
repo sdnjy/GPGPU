@@ -227,6 +227,40 @@ __global__ void resize(unsigned char *response, unsigned char *crop_x, const siz
     }
 }
 
+
+__global__ void myMax(const unsigned char* input, const int size, int* maxOut)
+{
+    __shared__ int sharedMax;
+  
+    if (0 == threadIdx.x)
+    {
+        sharedMax = 0;
+    }
+  
+    __syncthreads();
+  
+    int localMax = 0;
+  
+    for (int i = threadIdx.x; i < size; i += blockDim.x)
+    {
+        const int val = input[i];
+  
+        if (localMax < val)
+        {
+            localMax = val;
+        }
+    }
+  
+    atomicMax(&sharedMax, localMax);
+  
+    __syncthreads();
+  
+    if (0 == threadIdx.x)
+    {
+        *maxOut = sharedMax;
+    }
+}
+
 // Main function (will need refacto)
 void image_to_features(std::string path, const int scale_factor, const int pool_size,
                         const int postproc_size, const std::string output_path)
@@ -240,8 +274,8 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     }
 
     // No more cv::mat
-    size_t cols = mat_img.cols;
-    size_t rows = mat_img.rows;
+    const size_t cols = mat_img.cols;
+    const size_t rows = mat_img.rows;
     size_t img_size = cols * rows * sizeof(unsigned char);
     unsigned char *img = mat_img.data;
 
@@ -271,8 +305,6 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     size_t num_patchs_x = cols / pool_size;
     size_t num_patchs_y = rows / pool_size;
 
-    unsigned char* response = (unsigned char*) calloc(num_patchs_y * num_patchs_x, sizeof(unsigned char));
-    
     // Malloc for GPU
     img_size = num_patchs_y * num_patchs_x;
     int* int_resp_gpu;
@@ -290,18 +322,16 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
     clip<<<gridSize, blockSize>>>(int_resp_gpu, resp_gpu, num_patchs_x,  num_patchs_y, pool_size_squared);
     cudaDeviceSynchronize();
 
-    // Return response in CPU
-    cudaMemcpy(response, resp_gpu, img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
-
     // Get max value
-    uint8_t max_value = 0;
-    for (int i = 0; i < num_patchs_y * num_patchs_x; ++i)
-    {
-        if (max_value < response[i])
-        {
-            max_value = response[i];
-        }
-    }
+    int max_value = 0;
+    int* d_max_value;
+    cudaMalloc(&d_max_value, sizeof(int));
+    cudaMemcpy(d_max_value, &max_value, sizeof(int), cudaMemcpyHostToDevice);
+
+    myMax<<<gridSize, blockSize>>>(resp_gpu, img_size, d_max_value);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(&max_value, d_max_value, sizeof(int), cudaMemcpyDeviceToHost);
 
     // Allocate CPU and GPU temporary morpho
     unsigned char *tmp_morpho = (unsigned char*) calloc(num_patchs_y * num_patchs_x, sizeof(unsigned char));
@@ -335,9 +365,9 @@ void image_to_features(std::string path, const int scale_factor, const int pool_
 
     // Free all allocations
     free(res);
-    free(response);
     free(tmp_morpho);
 
+    cudaFree(d_max_value);
     cudaFree(img_gpu);
     cudaFree(sobelx_gpu);
     cudaFree(sobely_gpu);

@@ -6,9 +6,11 @@
 This project is composed of:
 * A CPU version
 * A GPU version
+* An improved GPU version (GPU_version2)
 
 ## How to run with docker
-`docker-compose up --build -d`  
+We created a docker image that is ready to compile and run cuda with openCV installed on it.
+`docker-compose up -d`  
 Then SSH to the docker: `docker exec -it gpgpu_dev_env /bin/bash`
 
 ### Exit docker
@@ -18,14 +20,14 @@ Then: `docker-compose down`
 
 ## Make
 We use Cmake. Go to the folder corresponding to the implementation you wish to use:  
-`cd CPU_version` or `cd GPU_version`  
+`cd CPU_version` or `cd GPU_version` or `cd GPU_version2`
 Then: `mkdir build && cd build`  
 `cmake .. && make`  
 
 ## How to run
-Put the images you wish to process in the input_images folder  
+Put the images you wish to process in the `input_images` folder  
 When you have done the make part: `./main`  
-The images should be written inside the output_images folder  
+The images will be written inside the `output_images` folder  
 
 ## Benchmark
 To run the benchmark: `nvprof ./main`
@@ -34,4 +36,4 @@ To run the benchmark: `nvprof ./main`
 * Denjoy Segolene (Shayminifly)
 * Le Helloco Quentin (Viri0x)
 * Sharpin Etienne (atomesZ)
-* Laura Lacambra (laura519)
+* Lacambra Laura (laura519)
