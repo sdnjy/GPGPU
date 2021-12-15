@@ -227,26 +227,6 @@ __global__ void resize(unsigned char *response, unsigned char *crop_x, const siz
     }
 }
 
-/*
-__global__ void myMax(unsigned char* input, const int size, int* maxOut)
-{
-    int localMax = 0;
-  
-    for (int i = threadIdx.x; i < size; i += blockDim.x)
-    {
-        int val = input[i];
-  
-        if (localMax < val)
-        {
-            localMax = val;
-        }
-    }
-  
-    atomicMax(maxOut, localMax);
-  
-    __syncthreads();
-}
-*/
 
 __global__ void myMax(const unsigned char* input, const int size, int* maxOut)
 {
