@@ -6,7 +6,7 @@ find_package( OpenCV REQUIRED )
 find_package( CUDA REQUIRED )
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fsanitize=address")
-set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++17" )
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++17 -O3" )
 
 
 file(GLOB main_SRC
